@@ -34,5 +34,88 @@ La aplicación en C++ que se comunicará con el filtro a través de IOCTL para:
 Recibir paquetes capturados.
 Configurar filtros de tráfico.
 Controlar el filtro (enumeración de interfaces, reinicios, etc.).
-Próximos Pasos
-Probar el filtro NDIS en Windows y verificar que los paquete
+
+
+# Arquitectura NDIS
+
+
+```
+-------------------------------------------------
+|   Aplicaciones de Red (Chrome, Steam, etc.)   |
+-------------------------------------------------
+|   Protocolos de Red (TCP/IP, UDP, etc.)       |
+-------------------------------------------------
+|   Filtro NDIS (iDevPeek)                      | <-- el driver
+-------------------------------------------------
+|   Controlador Miniport (Driver de la NIC)     |
+-------------------------------------------------
+|   Hardware de Red (Tarjeta de red física)     |
+-------------------------------------------------
+```
+
+# ¿Cómo funciona un filtro NDIS?
+Cuando un paquete de red pasa por el filtro, se llaman funciones específicas:
+
+Tipo de tráfico	Función en el filtro NDIS
+* Paquete enviado por el sistema	FilterSendNetBufferLists()
+* Confirmación de envío de un paquete	FilterSendNetBufferListsComplete()
+* Paquete recibido desde la red	FilterReceiveNetBufferLists()
+* Devolución del paquete recibido	FilterReturnNetBufferLists()
+
+Ejemplo simplificado de FilterReceiveNetBufferLists:
+
+```
+VOID
+FilterReceiveNetBufferLists(
+    NDIS_HANDLE FilterModuleContext,
+    PNET_BUFFER_LIST NetBufferLists,
+    NDIS_PORT_NUMBER PortNumber,
+    ULONG NumberOfNetBufferLists,
+    ULONG ReceiveFlags
+    )
+{
+    // Aquí es posible inspeccionar o modificar los paquetes recibidos
+    ProcessNetworkTraffic(NetBufferLists);
+    
+    // Luego pasamos los paquetes al protocolo de red
+    NdisFIndicateReceiveNetBufferLists(
+        FilterModuleContext, 
+        NetBufferLists, 
+        PortNumber, 
+        NumberOfNetBufferLists, 
+        ReceiveFlags);
+}
+```
+
+En esta función, podemos leer los paquetes, guardarlos en un buffer, enviarlos a una app en user-mode, modificarlos o bloquearlos antes de que el sistema los procese.
+
+
+FLUJO DE DATOS
+==============
+
+
+Un paquete sale de una aplicación en Windows --->
+
+1. La aplicación envía datos a través del stack TCP/IP.
+2. El driver de protocolo los pasa a NDIS.
+3. El filtro NDIS puede interceptar o modificar los datos.
+4. El miniport los envía a la tarjeta de red.
+5. La tarjeta transmite el paquete.
+
+Un paquete llega desde la red <----
+
+1. La tarjeta de red recibe el paquete.
+2. El miniport entrega los datos a NDIS.
+3. El filtro NDIS puede interceptarlo y modificarlo.
+4. El driver de protocolo entrega los datos a la aplicación.
+
+# ¿Cómo se relaciona con el filtro NDIS?
+
+* Un filtro NDIS se "engancha" a un miniport para inspeccionar o modificar los paquetes que entran y salen.
+* FilterAttach se ejecuta cuando el filtro se conecta a un miniport.
+* FilterDetach se ejecuta cuando el filtro se desconecta.
+
+
+
+
+
