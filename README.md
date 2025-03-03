@@ -1,8 +1,8 @@
 # iDev
-Low-level developments for Windows
+## Low-level developments for Windows
 
 
-En esta solucion hay dos proyectos:
+### En esta solucion hay dos proyectos:
 
 # 1) Filtro NDIS
 Implementación de un filtro NDIS para interceptar y manipular paquetes de red en Windows. 
