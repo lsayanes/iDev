@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="iDevPeekApp.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="IOCTL">
+      <UniqueIdentifier>{51115377-f034-48ee-a7c5-b0c552d59862}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\IOCTL\iDevPeekIoctl.h">
+      <Filter>IOCTL</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
