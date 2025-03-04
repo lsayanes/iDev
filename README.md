@@ -1,10 +1,9 @@
-# iDev
-## Low-level developments for Windows
+# iDev { Low-level developments for Windows }
 
 
 ### En esta solucion hay dos proyectos:
 
-# 1) Filtro NDIS
+## 1) Filtro NDIS
 Implementación de un filtro NDIS para interceptar y manipular paquetes de red en Windows. 
 
 Función:
@@ -28,15 +27,15 @@ Función iDevPeekDeviceIoControl
 * Enumerar interfaces activas (IOCTL_FILTER_ENUERATE_ALL_INSTANCES).
 * Reiniciar una interfaz filtrada (IOCTL_FILTER_RESTART_ONE_INSTANCE).
 
-# 2) Aplicación en C++
+## 2) Aplicación en C++
 La aplicación en C++ que se comunicará con el filtro a través de IOCTL para:
 
 Recibir paquetes capturados.
 Configurar filtros de tráfico.
 Controlar el filtro (enumeración de interfaces, reinicios, etc.).
 
-
-# Arquitectura NDIS
+<details>
+<summary>Arquitectura NDIS</summary>
 
 
 ```
@@ -88,10 +87,10 @@ FilterReceiveNetBufferLists(
 ```
 
 En esta función, podemos leer los paquetes, guardarlos en un buffer, enviarlos a una app en user-mode, modificarlos o bloquearlos antes de que el sistema los procese.
+</details>
 
-
-FLUJO DE DATOS
-==============
+<details>
+<summary>FLUJO DE DATOS</summary>
 
 
 Un paquete sale de una aplicación en Windows --->
@@ -115,7 +114,7 @@ Un paquete llega desde la red <----
 * FilterAttach se ejecuta cuando el filtro se conecta a un miniport.
 * FilterDetach se ejecuta cuando el filtro se desconecta.
 
-
+</details>
 
 
 
