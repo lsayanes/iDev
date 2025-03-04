@@ -202,8 +202,8 @@ Por eso, en lugar de modificar el Request original, se clona y se reenvía al si
 ```
 Status = NdisFOidRequest(pFilter->FilterHandle, ClonedRequest);
 ```
-    * Si el miniport lo procesa exitosamente, se llama a FilterOidRequestComplete().
-	* Si el miniport lo rechaza, se notifica el fallo y se limpia la memoria.
+* Si el miniport lo procesa exitosamente, se llama a FilterOidRequestComplete().
+* Si el miniport lo rechaza, se notifica el fallo y se limpia la memoria.
 
 4️. Cuando el OID termina, se completa el original
 ```
