@@ -13,8 +13,9 @@ int main()
         FILE_ATTRIBUTE_NORMAL,
         NULL);
 
-    if (hDevice == INVALID_HANDLE_VALUE) {
-        std::cerr << "Error al abrir el dispositivo: " << GetLastError() << std::endl;
+    if (hDevice == INVALID_HANDLE_VALUE) 
+    {
+        std::cout << "Error al abrir el dispositivo: " << GetLastError() << std::endl;
         return 1;
     }
 
@@ -30,8 +31,9 @@ int main()
     {
         std::cout << "Paquete recibido! Tamaño: " << bytesReturned << " bytes" << std::endl;
     }
-    else {
-        std::cerr << "Error en IOCTL: " << GetLastError() << std::endl;
+    else 
+    {
+        std::cout << "Error en IOCTL: " << GetLastError() << std::endl;
     }
 
     CloseHandle(hDevice);
