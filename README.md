@@ -216,4 +216,48 @@ FilterOidRequestComplete(pFilter, ClonedRequest, Status);
 
 </details>
 
+<details>
 
+<summary>IRQL (Interrupt Request Level) </summary>
+<br>
+
+Es el nivel de prioridad con el que se ejecuta el código en el kernel de Windows. 
+Mientras más alto sea el nivel, menos operaciones están permitidas.
+
+Los niveles más comunes son:
+
+PASSIVE_LEVEL (0) = Nivel más bajo, permite ejecutar código en contexto de usuario, usar paginación y llamar funciones bloqueantes.
+DISPATCH_LEVEL (2) = No permite esperas bloqueantes ni acceso a memoria paginada.
+DIRQL (Niveles altos) → Solo se usa en controladores de hardware, para manejar interrupciones.
+
+Como se setea:
+```
+	_IRQL_requires_max_(PASSIVE_LEVEL)
+```
+
+Este es un annotation de análisis estático que indica que la función iDevPeekRegisterDevice solo puede ejecutarse en un nivel de interrupción (IRQL) menor o igual a PASSIVE_LEVEL.
+
+
+¿Por qué elijo PASSIVE_LEVEL en esta función?
+iDevPeekRegisterDevice crea un dispositivo y registra dispatch handlers, lo que implica:
+
+* Llamar a funciones como NdisRegisterDeviceEx, que solo pueden ejecutarse en PASSIVE_LEVEL porque pueden bloquear la ejecución.
+* Operaciones con nombres Unicode (NdisInitUnicodeString), que requieren memoria paginada.
+* Manipulación de estructuras de dispositivo y memoria del sistema.
+* Si se intentara ejecutar esta función en DISPATCH_LEVEL o superior, el sistema podría generar un bug check (la famosa... pantalla azul)
+
+
+### ¿Qué hace _IRQL_requires_max_?
+
+Es un annotation de Microsoft que:
+
+* Ayuda al analizador de código estático a detectar posibles errores de IRQL.
+* Evita llamadas inseguras desde contextos de ejecución inapropiados.
+
+### Resumen:
+* _IRQL_requires_max_(PASSIVE_LEVEL) indica que la función debe ejecutarse en PASSIVE_LEVEL o inferior.
+* Protege contra llamadas en niveles de interrupción incorrectos.
+* Es útil para evitar bug checks y facilitar el análisis estático del código.
+
+
+</details>
