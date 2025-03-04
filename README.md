@@ -4,12 +4,12 @@
 ### En esta solucion hay dos proyectos:
 
 ## 1) Filtro NDIS
-Implementación de un filtro NDIS para interceptar y manipular paquetes de red en Windows. 
+Implementación de un filtro NDIS para interceptar y manipular paquetes de red en Wind``ows. 
 
 Función:
 
 ```
-FilterReceiveNetBufferLists
+	FilterReceiveNetBufferLists
 ```
 
 Esta función se encarga de recibir paquetes de red desde el adaptador de red y pasarlos a capas superiores.
@@ -64,34 +64,32 @@ Tipo de tráfico	Función en el filtro NDIS
 Ejemplo simplificado de FilterReceiveNetBufferLists:
 
 ```
-VOID
-FilterReceiveNetBufferLists(
-    NDIS_HANDLE FilterModuleContext,
-    PNET_BUFFER_LIST NetBufferLists,
-    NDIS_PORT_NUMBER PortNumber,
-    ULONG NumberOfNetBufferLists,
-    ULONG ReceiveFlags
-    )
-{
-    // Aquí es posible inspeccionar o modificar los paquetes recibidos
-    ProcessNetworkTraffic(NetBufferLists);
+	VOID
+	FilterReceiveNetBufferLists(
+		NDIS_HANDLE FilterModuleContext,
+		PNET_BUFFER_LIST NetBufferLists,
+		NDIS_PORT_NUMBER PortNumber,
+		ULONG NumberOfNetBufferLists,
+		ULONG ReceiveFlags
+		)
+	{
+		// Aquí es posible inspeccionar o modificar los paquetes recibidos
+		ProcessNetworkTraffic(NetBufferLists);
     
-    // Luego pasamos los paquetes al protocolo de red
-    NdisFIndicateReceiveNetBufferLists(
-        FilterModuleContext, 
-        NetBufferLists, 
-        PortNumber, 
-        NumberOfNetBufferLists, 
-        ReceiveFlags);
-}
+		// Luego pasamos los paquetes al protocolo de red
+		NdisFIndicateReceiveNetBufferLists(
+			FilterModuleContext, 
+			NetBufferLists, 
+			PortNumber, 
+			NumberOfNetBufferLists, 
+			ReceiveFlags);
+	}
 ```
 
 En esta función, podemos leer los paquetes, guardarlos en un buffer, enviarlos a una app en user-mode, modificarlos o bloquearlos antes de que el sistema los procese.
-</details>
 
-<details>
-<summary>FLUJO DE DATOS</summary>
-
+FLUJO DE DATOS
+=============
 
 Un paquete sale de una aplicación en Windows --->
 
@@ -108,7 +106,7 @@ Un paquete llega desde la red <----
 3. El filtro NDIS puede interceptarlo y modificarlo.
 4. El driver de protocolo entrega los datos a la aplicación.
 
-# ¿Cómo se relaciona con el filtro NDIS?
+### ¿Cómo se relaciona con el filtro NDIS?
 
 * Un filtro NDIS se "engancha" a un miniport para inspeccionar o modificar los paquetes que entran y salen.
 * FilterAttach se ejecuta cuando el filtro se conecta a un miniport.
@@ -116,5 +114,106 @@ Un paquete llega desde la red <----
 
 </details>
 
+<details>
+
+<summary>OID -> NDIS</summary>
+
+
+Los OID (Object Identifier) requests son mensajes usados para leer o modificar configuraciones de un adaptador de red en Windows.
+
+En un filtro NDIS, estos comandos permiten interceptar, modificar o bloquear solicitudes que afectan al adaptador de red.
+
+### ¿Qué cosas se pueden hacer con OID?
+1. Consultar información del adaptador de red
+
+	Velocidad de conexión (OID_GEN_LINK_SPEED).
+	Dirección MAC (OID_802_3_CURRENT_ADDRESS).
+	Estadísticas de tráfico (OID_GEN_STATISTICS).
+
+2. Modificar parámetros del adaptador
+
+	Activar/desactivar modos (OID_GEN_CURRENT_PACKET_FILTER).
+	Configurar VLANs (OID_GEN_VLAN_ID).
+	Cambiar direcciones MAC (OID_802_3_MULTICAST_LIST).
+
+3. Interceptar solicitudes de configuración
+
+	Bloquear cambios no deseados.
+	Alterar parámetros antes de enviarlos al adaptador.
+	Registrar estadísticas o detectar anomalías.
+
+Esto sucede en la función FilterOidRequest de filter.c 
+
+
+* Por ejemplo se quiere bloquear el cambio de dirección MAC en una tarjeta de red:
+
+	1. Un programa ejecuta:
+
+	```
+			NdisSetRequest(OID_802_3_CURRENT_ADDRESS, nueva_direccion_mac);
+	```
+	
+	2. FilterOidRequest intercepta el OID.
+	3. En el filtro NDIS, verificas el OID y rechazas la solicitud:
+
+	```
+			if (Request->Oid == OID_802_3_CURRENT_ADDRESS) 
+			{
+				return NDIS_STATUS_NOT_SUPPORTED;  // Bloquea el cambio de MAC
+			}
+	```
+
+	4.  La solicitud es bloqueada y el sistema sigue usando la MAC original
+
+
+
+### Es obligatorio clonar el OID en un filtro NDIS
+
+En un filtro NDIS, el controlador de red espera una respuesta a cada solicitud OID que recibe. 
+Si el filtro no responde, la solicitud se pierde y el sistema puede comportarse de manera inesperada.
+
+Razón principal:
+Cuando un filtro recibe un OID, no debe modificar ni retener el original porque no le pertenece. 
+Windows lo envía al filtro solo para ser procesado, pero el propietario real del OID es la capa superior (por ejemplo, un protocolo o una aplicación).
+
+Por eso, en lugar de modificar el Request original, se clona y se reenvía al siguiente nivel.
+
+### Proceso
+
+1. Llega un OID desde capas superiores
+
+	Windows o una aplicación envía un comando, por ejemplo, para cambiar la dirección MAC.
+	Se ejecuta FilterOidRequest().
+
+2.  Se clona la solicitud
+	```
+	Status = NdisAllocateCloneOidRequest(
+					pFilter->FilterHandle,
+					Request,         // OID original
+					FILTER_TAG,      // Etiqueta de memoria
+					&ClonedRequest   // Nuevo OID clonado
+				);
+
+	```	
+	Esto crea una copia exacta del OID original.
+
+
+3️. Se envía el OID clonado al siguiente nivel (el miniport)
+```
+Status = NdisFOidRequest(pFilter->FilterHandle, ClonedRequest);
+```
+    * Si el miniport lo procesa exitosamente, se llama a FilterOidRequestComplete().
+	* Si el miniport lo rechaza, se notifica el fallo y se limpia la memoria.
+
+4️. Cuando el OID termina, se completa el original
+```
+FilterOidRequestComplete(pFilter, ClonedRequest, Status);
+```
+### ¿Qué pasaría si NO clonamos el OID?
+* Si el filtro modifica el Request original → Puede causar problemas porque la capa superior sigue esperando el mismo OID intacto.
+* Si el filtro retiene el Request original → Se rompe la cadena de comunicación y Windows podría bloquear el adaptador de red.
+* Si el filtro no clona pero reenvía el OID → Windows podría reutilizar la estructura mientras aún está en uso, causando corrupción de memoria.
+
+</details>
 
 
